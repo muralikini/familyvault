@@ -247,11 +247,13 @@
 
             try {
                 if (currentPhotoFile) {
-                    console.log("Uploading photo...");
-                    const storageRef = storage.ref('family-photos/' + Date.now() + '_' + currentPhotoFile.name);
+                    console.log("📸 Uploading photo...");
+                    const fileName = Date.now() + '_' + currentPhotoFile.name;
+                    const storageRef = storage.ref('family-photos/' + fileName);
+                    
                     const snapshot = await storageRef.put(currentPhotoFile);
                     photoURL = await snapshot.ref.getDownloadURL();
-                    console.log("Photo uploaded successfully:", photoURL);
+                    console.log("✅ Photo uploaded:", photoURL);
                 }
 
                 const memberData = {
@@ -262,7 +264,7 @@
                     email: document.getElementById('fEmail').value,
                     address: document.getElementById('fAddress').value,
                     photoURL: photoURL,
-                    updatedAt: new Date()
+                    updatedAt: new Date().toISOString()
                 };
 
                 if (editingMemberId) {
@@ -276,8 +278,8 @@
                 loadFamilyTable();
 
             } catch (error) {
-                console.error("Error saving member:", error);
-                alert("❌ Error saving: " + error.message);
+                console.error("Upload Error:", error);
+                alert("❌ Failed to save. Error: " + error.message + "\n\nPlease make sure you updated Storage Rules.");
             }
         }
 
