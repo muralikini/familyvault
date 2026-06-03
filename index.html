@@ -59,6 +59,16 @@
         </div>
     </div>
 
+    <!-- DOCUMENT VIEWER MODAL -->
+    <div id="docViewerModal" class="modal">
+        <div class="modal-content">
+            <h2 id="modalDocTitle"></h2>
+            <div id="modalDocDetails"></div>
+            <div id="modalPhotos" style="margin:20px 0;"></div>
+            <button class="btn btn-danger" onclick="closeModal()">Close</button>
+        </div>
+    </div>
+
     <script>
         // ================== YOUR FIREBASE CONFIG ==================
         const firebaseConfig = {
@@ -534,12 +544,10 @@
                     <div class="photo-section">
                         <label>Front Side</label><br>
                         <input type="file" id="docFront" accept="image/*">
-                        <div id="frontPreview"></div>
                     </div>
                     <div class="photo-section">
                         <label>Back Side (Optional)</label><br>
                         <input type="file" id="docBack" accept="image/*">
-                        <div id="backPreview"></div>
                     </div>
 
                     <div class="form-buttons">
@@ -550,7 +558,7 @@
 
                 <h3>All Documents</h3>
                 <table id="documentsTable">
-                    <thead><tr><th>Type</th><th>Number</th><th>Expiry</th><th>Issued To</th><th>Documents</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>Type</th><th>Number</th><th>Expiry</th><th>Issued To</th><th>Actions</th></tr></thead>
                     <tbody></tbody>
                 </table>
             `;
@@ -573,9 +581,6 @@
                 document.getElementById('docNumber').value = doc.number || '';
                 document.getElementById('docExpiry').value = doc.expiry || '';
                 document.getElementById('docIssuedTo').value = doc.issuedTo || '';
-
-                if (doc.frontURL) document.getElementById('frontPreview').innerHTML = `<a href="${doc.frontURL}" target="_blank">View Front</a>`;
-                if (doc.backURL) document.getElementById('backPreview').innerHTML = `<a href="${doc.backURL}" target="_blank">View Back</a>`;
             }
         }
 
@@ -586,9 +591,7 @@
 
         async function saveDocument() {
             let type = document.getElementById('docType').value;
-            if (type === 'Custom') type = document.getElementById('customType').value;
-
-            if (!type) return alert("Document type is required");
+            if (type === 'Custom') type = document.getElementById('customType').value || 'Custom';
 
             const docData = {
                 type: type,
@@ -604,7 +607,6 @@
                 } else {
                     await db.collection('documents').add(docData);
                 }
-
                 alert("✅ Document saved successfully!");
                 hideDocumentForm();
                 loadDocumentsTable();
@@ -627,16 +629,44 @@
                     <td>${d.expiry || '-'}</td>
                     <td>${d.issuedTo || '-'}</td>
                     <td>
-                        ${d.frontURL ? `<a href="${d.frontURL}" target="_blank">📄 Front</a>` : ''} 
-                        ${d.backURL ? ` | <a href="${d.backURL}" target="_blank">📄 Back</a>` : ''}
-                    </td>
-                    <td>
+                        <button class="btn btn-primary" onclick="viewDocument('${doc.id}')">View</button>
                         <button class="btn btn-primary" onclick="editDocument('${doc.id}')">Edit</button>
                         <button class="btn btn-danger" onclick="deleteDocument('${doc.id}')">Delete</button>
                     </td>
                 `;
                 tbody.appendChild(row);
             });
+        }
+
+        async function viewDocument(id) {
+            const doc = await db.collection('documents').doc(id).get();
+            if (!doc.exists) return;
+
+            const d = doc.data();
+            const modal = document.getElementById('docViewerModal');
+            document.getElementById('modalDocTitle').textContent = d.type;
+
+            let html = `
+                <p><strong>Number:</strong> ${d.number || 'N/A'}</p>
+                <p><strong>Expiry:</strong> ${d.expiry || 'N/A'}</p>
+                <p><strong>Issued To:</strong> ${d.issuedTo || 'N/A'}</p>
+                <hr>
+                <h4>Photos</h4>
+            `;
+
+            if (d.frontURL) {
+                html += `<p><strong>Front:</strong> <a href="${d.frontURL}" target="_blank">View & Download</a></p>`;
+            }
+            if (d.backURL) {
+                html += `<p><strong>Back:</strong> <a href="${d.backURL}" target="_blank">View & Download</a></p>`;
+            }
+
+            document.getElementById('modalDocDetails').innerHTML = html;
+            modal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('docViewerModal').style.display = 'none';
         }
 
         function editDocument(id) {
