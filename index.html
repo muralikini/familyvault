@@ -139,10 +139,82 @@
             else if (currentTab === 'admin') renderAdminPanel();
         }
 
-        function renderDashboard() {
-            document.getElementById('content').innerHTML += `<p><strong>Welcome to Family Vault!</strong><br>Use the tabs to manage your family information securely.</p>`;
+        // ====================== DASHBOARD (FULLY FUNCTIONAL) ======================
+        async function renderDashboard() {
+            const content = document.getElementById('content');
+
+            const familySnap = await db.collection('family').get();
+            const docSnap = await db.collection('documents').get();
+
+            let totalFamily = familySnap.docs.length;
+            let totalDocs = docSnap.docs.length;
+
+            content.innerHTML += `
+                <h2>📊 Family Vault Overview</h2>
+                
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <h3>👨‍👩‍👧‍👦 Family Members</h3>
+                        <div class="value">${totalFamily}</div>
+                    </div>
+                    <div class="card">
+                        <h3>📄 Total Documents</h3>
+                        <div class="value">${totalDocs}</div>
+                    </div>
+                    <div class="card">
+                        <h3>🔐 Secure Records</h3>
+                        <div class="value">${totalFamily + totalDocs}</div>
+                    </div>
+                    <div class="card">
+                        <h3>👤 Logged in as</h3>
+                        <div class="value">${currentUser.username}</div>
+                        <small>Role: ${currentUser.role}</small>
+                    </div>
+                </div>
+
+                <h3>Recent Family Members</h3>
+                <table id="recentFamilyTable">
+                    <thead><tr><th>Name</th><th>Relation</th><th>Phone</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+
+                <h3>Recent Documents</h3>
+                <table id="recentDocsTable">
+                    <thead><tr><th>Type</th><th>Number</th><th>Issued To</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            `;
+
+            loadRecentFamily();
+            loadRecentDocuments();
         }
 
+        async function loadRecentFamily() {
+            const { docs } = await db.collection('family').orderBy('updatedAt', 'desc').limit(5).get();
+            const tbody = document.querySelector('#recentFamilyTable tbody');
+            tbody.innerHTML = docs.length ? '' : '<tr><td colspan="3">No records yet</td></tr>';
+
+            docs.forEach(doc => {
+                const m = doc.data();
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${m.name}</td><td>${m.relation}</td><td>${m.phone || '-'}</td>`;
+                tbody.appendChild(row);
+            });
+        }
+
+        async function loadRecentDocuments() {
+            const { docs } = await db.collection('documents').orderBy('updatedAt', 'desc').limit(5).get();
+            const tbody = document.querySelector('#recentDocsTable tbody');
+            tbody.innerHTML = docs.length ? '' : '<tr><td colspan="3">No documents yet</td></tr>';
+
+            docs.forEach(doc => {
+                const d = doc.data();
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${d.type}</td><td>${d.number || '-'}</td><td>${d.issuedTo || '-'}</td>`;
+                tbody.appendChild(row);
+            });
+        }
+        // ====================== DASHBOARD (FULLY FUNCTIONAL) ======================
         //function renderFamily() { document.getElementById('content').innerHTML += `<p>Family Members Module - Under Development</p>`; }
         //function renderDocuments() { document.getElementById('content').innerHTML += `<p>Documents Module - Under Development</p>`; }
 
