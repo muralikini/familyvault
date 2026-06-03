@@ -19,18 +19,44 @@
         body.dark .tab { background: #334155; color: #cbd5e1; }
         .tab.active { background: var(--primary); color: white; }
         .content { background: var(--card); padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .form-container { background: var(--card); padding: 25px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin: 20px 0; display: none; }
+
+        .form-container { background: var(--card); padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin: 20px 0; display: none; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .form-group { margin-bottom: 18px; }
         .form-group label { display: block; margin-bottom: 6px; font-weight: 600; }
-        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
-        .btn { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin: 5px; }
+        .form-group input, .form-group select { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
+        .full-width { grid-column: 1 / -1; }
+        .photo-section { margin: 15px 0; text-align: center; }
+        .photo-preview { max-width: 200px; border-radius: 12px; border: 2px solid #ddd; margin: 8px; }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: var(--card);
+            padding: 25px;
+            border-radius: 12px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin: 5px; }
         .btn-primary { background: var(--primary); color: white; }
         .btn-danger { background: #ef4444; color: white; }
-        .photo-preview { max-width: 180px; border-radius: 8px; margin: 8px; border: 2px solid #ddd; }
+        .btn-info { background: #3b82f6; color: white; }
+
         table { width: 100%; border-collapse: collapse; margin: 15px 0; }
         th, td { padding: 12px; border: 1px solid var(--border); text-align: left; }
         th { background: #f1f5f9; }
-        body.dark th { background: #334155; }
     </style>
 </head>
 <body onload="loadDarkMode()">
@@ -64,7 +90,8 @@
         <div class="modal-content">
             <h2 id="modalDocTitle"></h2>
             <div id="modalDocDetails"></div>
-            <div id="modalPhotos" style="margin:20px 0;"></div>
+            <h3>Photos</h3>
+            <div id="modalPhotos" style="margin:20px 0; text-align:center;"></div>
             <button class="btn btn-danger" onclick="closeModal()">Close</button>
         </div>
     </div>
@@ -542,11 +569,11 @@
                     </div>
 
                     <div class="photo-section">
-                        <label>Front Side</label><br>
+                        <label>Front Side Photo</label><br>
                         <input type="file" id="docFront" accept="image/*">
                     </div>
                     <div class="photo-section">
-                        <label>Back Side (Optional)</label><br>
+                        <label>Back Side Photo (Optional)</label><br>
                         <input type="file" id="docBack" accept="image/*">
                     </div>
 
@@ -593,25 +620,46 @@
             let type = document.getElementById('docType').value;
             if (type === 'Custom') type = document.getElementById('customType').value || 'Custom';
 
-            const docData = {
-                type: type,
-                number: document.getElementById('docNumber').value,
-                expiry: document.getElementById('docExpiry').value,
-                issuedTo: document.getElementById('docIssuedTo').value,
-                updatedAt: new Date().toISOString()
-            };
+            let frontURL = '', backURL = '';
 
             try {
+                const frontFile = document.getElementById('docFront').files[0];
+                if (frontFile) {
+                    const ref = storage.ref('documents/' + Date.now() + '_front_' + frontFile.name);
+                    await ref.put(frontFile);
+                    frontURL = await ref.getDownloadURL();
+                }
+
+                const backFile = document.getElementById('docBack').files[0];
+                if (backFile) {
+                    const ref = storage.ref('documents/' + Date.now() + '_back_' + backFile.name);
+                    await ref.put(backFile);
+                    backURL = await ref.getDownloadURL();
+                }
+
+                const docData = {
+                    type: type,
+                    number: document.getElementById('docNumber').value,
+                    expiry: document.getElementById('docExpiry').value,
+                    issuedTo: document.getElementById('docIssuedTo').value,
+                    frontURL: frontURL,
+                    backURL: backURL,
+                    updatedAt: new Date().toISOString()
+                };
+
                 if (editingDocId) {
                     await db.collection('documents').doc(editingDocId).update(docData);
                 } else {
                     await db.collection('documents').add(docData);
                 }
+
                 alert("✅ Document saved successfully!");
                 hideDocumentForm();
                 loadDocumentsTable();
+
             } catch (e) {
-                alert("Error saving document");
+                console.error(e);
+                alert("Error saving document. Please try again.");
             }
         }
 
@@ -629,7 +677,7 @@
                     <td>${d.expiry || '-'}</td>
                     <td>${d.issuedTo || '-'}</td>
                     <td>
-                        <button class="btn btn-primary" onclick="viewDocument('${doc.id}')">View</button>
+                        <button class="btn btn-info" onclick="viewDocument('${doc.id}')">View</button>
                         <button class="btn btn-primary" onclick="editDocument('${doc.id}')">Edit</button>
                         <button class="btn btn-danger" onclick="deleteDocument('${doc.id}')">Delete</button>
                     </td>
@@ -639,29 +687,33 @@
         }
 
         async function viewDocument(id) {
-            const doc = await db.collection('documents').doc(id).get();
-            if (!doc.exists) return;
+            const docSnap = await db.collection('documents').doc(id).get();
+            if (!docSnap.exists) return;
 
-            const d = doc.data();
+            const d = docSnap.data();
             const modal = document.getElementById('docViewerModal');
+
             document.getElementById('modalDocTitle').textContent = d.type;
 
-            let html = `
+            let details = `
                 <p><strong>Number:</strong> ${d.number || 'N/A'}</p>
                 <p><strong>Expiry:</strong> ${d.expiry || 'N/A'}</p>
                 <p><strong>Issued To:</strong> ${d.issuedTo || 'N/A'}</p>
                 <hr>
-                <h4>Photos</h4>
             `;
 
+            let photosHTML = `<h3>Photos</h3>`;
+
             if (d.frontURL) {
-                html += `<p><strong>Front:</strong> <a href="${d.frontURL}" target="_blank">View & Download</a></p>`;
+                photosHTML += `<p><strong>Front Side:</strong> <a href="${d.frontURL}" target="_blank" download>📥 Download Front</a></p>`;
+                photosHTML += `<img src="${d.frontURL}" style="max-width:100%; border-radius:8px; margin:10px 0;">`;
             }
             if (d.backURL) {
-                html += `<p><strong>Back:</strong> <a href="${d.backURL}" target="_blank">View & Download</a></p>`;
+                photosHTML += `<p><strong>Back Side:</strong> <a href="${d.backURL}" target="_blank" download>📥 Download Back</a></p>`;
+                photosHTML += `<img src="${d.backURL}" style="max-width:100%; border-radius:8px; margin:10px 0;">`;
             }
 
-            document.getElementById('modalDocDetails').innerHTML = html;
+            document.getElementById('modalDocDetails').innerHTML = details + photosHTML;
             modal.style.display = 'flex';
         }
 
