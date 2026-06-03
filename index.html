@@ -144,7 +144,7 @@
         }
 
         //function renderFamily() { document.getElementById('content').innerHTML += `<p>Family Members Module - Under Development</p>`; }
-        function renderDocuments() { document.getElementById('content').innerHTML += `<p>Documents Module - Under Development</p>`; }
+        //function renderDocuments() { document.getElementById('content').innerHTML += `<p>Documents Module - Under Development</p>`; }
 
         function renderAdminPanel() {
             document.getElementById('content').innerHTML += `<p>Admin Panel - User Management Ready</p>`;
@@ -305,6 +305,184 @@
             }
         }
         // ====================== FAMILY MEMBERS (FULLY FUNCTIONAL) ======================
+
+        // ====================== DOCUMENTS MODULE ======================
+        function renderDocuments() {
+            const content = document.getElementById('content');
+            content.innerHTML += `
+                <button class="btn btn-primary" onclick="showDocumentForm()">+ Add New Document</button>
+
+                <div class="form-container" id="documentForm">
+                    <h3 id="docFormTitle">Add Document</h3>
+                    <div class="form-grid">
+                        <div class="form-group"><label>Document Type</label>
+                            <select id="docType" onchange="toggleCustomType()">
+                                <option value="Aadhar Card">Aadhar Card</option>
+                                <option value="PAN Card">PAN Card</option>
+                                <option value="Passport">Passport</option>
+                                <option value="Voter ID">Voter ID</option>
+                                <option value="Driving License">Driving License</option>
+                                <option value="10th Certificate">10th Certificate</option>
+                                <option value="12th Certificate">12th Certificate</option>
+                                <option value="Degree Certificate">Degree Certificate</option>
+                                <option value="Custom">Custom Card / Certificate</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="customTypeGroup" style="display:none;">
+                            <label>Custom Type Name</label>
+                            <input type="text" id="customType">
+                        </div>
+                        <div class="form-group"><label>Document Number</label><input type="text" id="docNumber"></div>
+                        <div class="form-group"><label>Expiry Date (if any)</label><input type="date" id="docExpiry"></div>
+                        <div class="form-group full-width"><label>Issued To (Family Member)</label><input type="text" id="docIssuedTo"></div>
+                    </div>
+
+                    <div class="photo-section">
+                        <label>Front Side</label><br>
+                        <input type="file" id="docFront" accept="image/*" onchange="previewFront(event)">
+                        <div id="frontPreview"></div>
+                    </div>
+                    <div class="photo-section">
+                        <label>Back Side (Optional)</label><br>
+                        <input type="file" id="docBack" accept="image/*" onchange="previewBack(event)">
+                        <div id="backPreview"></div>
+                    </div>
+
+                    <div class="form-buttons">
+                        <button class="btn btn-primary" onclick="saveDocument()">Save Document</button>
+                        <button class="btn btn-danger" onclick="hideDocumentForm()">Cancel</button>
+                    </div>
+                </div>
+
+                <h3>All Documents</h3>
+                <table id="documentsTable">
+                    <thead><tr><th>Type</th><th>Number</th><th>Expiry</th><th>Issued To</th><th>Photos</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            `;
+            loadDocumentsTable();
+        }
+
+        function toggleCustomType() {
+            const type = document.getElementById('docType').value;
+            document.getElementById('customTypeGroup').style.display = type === 'Custom' ? 'block' : 'none';
+        }
+
+        function previewFront(e) {
+            const file = e.target.files[0];
+            if (file) document.getElementById('frontPreview').innerHTML = `<img src="${URL.createObjectURL(file)}" class="photo-preview">`;
+        }
+
+        function previewBack(e) {
+            const file = e.target.files[0];
+            if (file) document.getElementById('backPreview').innerHTML = `<img src="${URL.createObjectURL(file)}" class="photo-preview">`;
+        }
+
+        function showDocumentForm(doc = null) {
+            document.getElementById('documentForm').style.display = 'block';
+            editingDocId = doc ? doc.id : null;
+            document.getElementById('docFormTitle').textContent = doc ? "Edit Document" : "Add New Document";
+        }
+
+        function hideDocumentForm() {
+            document.getElementById('documentForm').style.display = 'none';
+        }
+
+        async function saveDocument() {
+            const type = document.getElementById('docType').value === 'Custom' ? 
+                         document.getElementById('customType').value : 
+                         document.getElementById('docType').value;
+
+            if (!type) return alert("Document type is required");
+
+            // Upload photos (simplified - you can expand later)
+            let frontURL = '', backURL = '';
+
+            try {
+                const frontFile = document.getElementById('docFront').files[0];
+                if (frontFile) {
+                    const ref = storage.ref('documents/' + Date.now() + '_front_' + frontFile.name);
+                    await ref.put(frontFile);
+                    frontURL = await ref.getDownloadURL();
+                }
+
+                const backFile = document.getElementById('docBack').files[0];
+                if (backFile) {
+                    const ref = storage.ref('documents/' + Date.now() + '_back_' + backFile.name);
+                    await ref.put(backFile);
+                    backURL = await ref.getDownloadURL();
+                }
+
+                const docData = {
+                    type: type,
+                    number: document.getElementById('docNumber').value,
+                    expiry: document.getElementById('docExpiry').value,
+                    issuedTo: document.getElementById('docIssuedTo').value,
+                    frontURL: frontURL,
+                    backURL: backURL,
+                    updatedAt: new Date().toISOString()
+                };
+
+                if (editingDocId) {
+                    await db.collection('documents').doc(editingDocId).update(docData);
+                } else {
+                    await db.collection('documents').add(docData);
+                }
+
+                alert("Document saved successfully!");
+                hideDocumentForm();
+                loadDocumentsTable();
+
+            } catch (e) {
+                console.error(e);
+                alert("Error saving document. Check console.");
+            }
+        }
+
+        async function loadDocumentsTable() {
+            const { docs } = await db.collection('documents').get();
+            const tbody = document.querySelector('#documentsTable tbody');
+            tbody.innerHTML = '';
+
+            docs.forEach(doc => {
+                const d = doc.data();
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${d.type}</td>
+                    <td>${d.number || '-'}</td>
+                    <td>${d.expiry || '-'}</td>
+                    <td>${d.issuedTo || '-'}</td>
+                    <td>
+                        ${d.frontURL ? `<a href="${d.frontURL}" target="_blank">Front</a>` : ''} 
+                        ${d.backURL ? ` | <a href="${d.backURL}" target="_blank">Back</a>` : ''}
+                    </td>
+                    <td>
+                        <button class="btn btn-primary" onclick="editDocument('${doc.id}')">Edit</button>
+                        <button class="btn btn-danger" onclick="deleteDocument('${doc.id}')">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function editDocument(id) {
+            db.collection('documents').doc(id).get().then(doc => {
+                if (doc.exists) {
+                    // For simplicity, we'll alert for now. You can expand full edit later.
+                    alert("Edit functionality can be expanded. Currently showing details.");
+                    console.log(doc.data());
+                }
+            });
+        }
+
+        async function deleteDocument(id) {
+            if (confirm("Delete this document?")) {
+                await db.collection('documents').doc(id).delete();
+                loadDocumentsTable();
+            }
+        }
+        // ====================== DOCUMENTS MODULE ======================
+        
 
         initDefaultAdmin();
         renderTabs();
