@@ -179,7 +179,7 @@
                             <option value="Father">Father</option><option value="Mother">Mother</option>
                             <option value="Son">Son</option><option value="Daughter">Daughter</option>
                         </select></div>
-                        <div class="form-group"><label>Date of Birth</label><input type="date" id="fDOB"></div>
+                        <div class="form-group"><label>DOB</label><input type="date" id="fDOB"></div>
                         <div class="form-group"><label>Phone</label><input type="text" id="fPhone"></div>
                         <div class="form-group"><label>Email</label><input type="email" id="fEmail"></div>
                         <div class="form-group full-width"><label>Address</label><input type="text" id="fAddress"></div>
@@ -210,8 +210,7 @@
             const file = e.target.files[0];
             if (file) {
                 currentPhotoFile = file;
-                const preview = document.getElementById('photoPreview');
-                preview.innerHTML = `<img src="${URL.createObjectURL(file)}" class="photo-preview">`;
+                document.getElementById('photoPreview').innerHTML = `<img src="${URL.createObjectURL(file)}" class="photo-preview">`;
             }
         }
 
@@ -220,23 +219,11 @@
             editingMemberId = member ? member.id : null;
             document.getElementById('formTitle').textContent = member ? "Edit Family Member" : "Add Family Member";
             document.getElementById('photoPreview').innerHTML = '';
-
-            if (member) {
-                document.getElementById('fName').value = member.name || '';
-                document.getElementById('fRelation').value = member.relation || 'Self';
-                document.getElementById('fDOB').value = member.dob || '';
-                document.getElementById('fPhone').value = member.phone || '';
-                document.getElementById('fEmail').value = member.email || '';
-                document.getElementById('fAddress').value = member.address || '';
-                if (member.photoURL) {
-                    document.getElementById('photoPreview').innerHTML = `<img src="${member.photoURL}" class="photo-preview">`;
-                }
-            }
+            currentPhotoFile = null;
         }
 
         function hideFamilyForm() {
             document.getElementById('familyForm').style.display = 'none';
-            currentPhotoFile = null;
         }
 
         async function saveFamilyMember() {
@@ -247,17 +234,16 @@
 
             try {
                 if (currentPhotoFile) {
-                    console.log("📸 Uploading photo...");
+                    console.log("Uploading photo...");
                     const fileName = Date.now() + '_' + currentPhotoFile.name;
                     const storageRef = storage.ref('family-photos/' + fileName);
-                    
                     const snapshot = await storageRef.put(currentPhotoFile);
                     photoURL = await snapshot.ref.getDownloadURL();
-                    console.log("✅ Photo uploaded:", photoURL);
+                    console.log("Photo uploaded successfully");
                 }
 
                 const memberData = {
-                    name: name,
+                    name, 
                     relation: document.getElementById('fRelation').value,
                     dob: document.getElementById('fDOB').value,
                     phone: document.getElementById('fPhone').value,
@@ -273,13 +259,13 @@
                     await db.collection('family').add(memberData);
                 }
 
-                alert("✅ Family member saved successfully!");
+                alert("✅ Saved successfully!");
                 hideFamilyForm();
                 loadFamilyTable();
 
             } catch (error) {
-                console.error("Upload Error:", error);
-                alert("❌ Failed to save. Error: " + error.message + "\n\nPlease make sure you updated Storage Rules.");
+                console.error(error);
+                alert("❌ Upload failed.\n\nMake sure you have updated the Storage Rules to allow read/write.");
             }
         }
 
@@ -313,7 +299,7 @@
         }
 
         async function deleteFamilyMember(id) {
-            if (confirm("Delete this family member?")) {
+            if (confirm("Delete this member?")) {
                 await db.collection('family').doc(id).delete();
                 loadFamilyTable();
             }
