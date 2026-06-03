@@ -321,10 +321,30 @@
             document.getElementById('formTitle').textContent = member ? "Edit Family Member" : "Add Family Member";
             document.getElementById('photoPreview').innerHTML = '';
             currentPhotoFile = null;
+
+            if (member) {
+                document.getElementById('fName').value = member.name || '';
+                document.getElementById('fRelation').value = member.relation || 'Self';
+                document.getElementById('fDOB').value = member.dob || '';
+                document.getElementById('fPhone').value = member.phone || '';
+                document.getElementById('fEmail').value = member.email || '';
+                document.getElementById('fAddress').value = member.address || '';
+                if (member.photoURL) {
+                    document.getElementById('photoPreview').innerHTML = `<img src="${member.photoURL}" class="photo-preview">`;
+                }
+            } else {
+                document.getElementById('fName').value = '';
+                document.getElementById('fRelation').value = 'Self';
+                document.getElementById('fDOB').value = '';
+                document.getElementById('fPhone').value = '';
+                document.getElementById('fEmail').value = '';
+                document.getElementById('fAddress').value = '';
+            }
         }
 
         function hideFamilyForm() {
             document.getElementById('familyForm').style.display = 'none';
+            editingMemberId = null;
         }
 
         async function saveFamilyMember() {
@@ -335,29 +355,29 @@
 
             try {
                 if (currentPhotoFile) {
-                    console.log("Uploading photo...");
                     const fileName = Date.now() + '_' + currentPhotoFile.name;
                     const storageRef = storage.ref('family-photos/' + fileName);
                     const snapshot = await storageRef.put(currentPhotoFile);
                     photoURL = await snapshot.ref.getDownloadURL();
-                    console.log("Photo uploaded successfully");
                 }
 
                 const memberData = {
-                    name, 
+                    name: name,
                     relation: document.getElementById('fRelation').value,
                     dob: document.getElementById('fDOB').value,
                     phone: document.getElementById('fPhone').value,
                     email: document.getElementById('fEmail').value,
                     address: document.getElementById('fAddress').value,
-                    photoURL: photoURL,
+                    photoURL: photoURL || (editingMemberId ? undefined : ''),
                     updatedAt: new Date().toISOString()
                 };
 
                 if (editingMemberId) {
                     await db.collection('family').doc(editingMemberId).update(memberData);
+                    console.log("Updated existing record");
                 } else {
                     await db.collection('family').add(memberData);
+                    console.log("Added new record");
                 }
 
                 alert("✅ Saved successfully!");
@@ -366,7 +386,7 @@
 
             } catch (error) {
                 console.error(error);
-                alert("❌ Upload failed.\n\nMake sure you have updated the Storage Rules to allow read/write.");
+                alert("❌ Error: " + error.message);
             }
         }
 
@@ -395,12 +415,14 @@
 
         function editFamilyMember(id) {
             db.collection('family').doc(id).get().then(doc => {
-                if (doc.exists) showFamilyForm({ id: doc.id, ...doc.data() });
-            });
+                if (doc.exists) {
+                    showFamilyForm({ id: doc.id, ...doc.data() });
+                }
+            }).catch(err => console.error(err));
         }
 
         async function deleteFamilyMember(id) {
-            if (confirm("Delete this member?")) {
+            if (confirm("Delete this family member?")) {
                 await db.collection('family').doc(id).delete();
                 loadFamilyTable();
             }
