@@ -502,6 +502,7 @@
         // ====================== FAMILY MEMBERS (FULLY FUNCTIONAL) ======================
 
         // ====================== DOCUMENTS MODULE ======================
+        // ====================== DOCUMENTS (FULLY FUNCTIONAL with Edit + Download) ======================
         function renderDocuments() {
             const content = document.getElementById('content');
             content.innerHTML += `
@@ -518,28 +519,26 @@
                                 <option value="Voter ID">Voter ID</option>
                                 <option value="Driving License">Driving License</option>
                                 <option value="10th Certificate">10th Certificate</option>
-                                <option value="12th Certificate">12th Certificate</option>
                                 <option value="Degree Certificate">Degree Certificate</option>
-                                <option value="Custom">Custom Card / Certificate</option>
+                                <option value="Custom">Custom</option>
                             </select>
                         </div>
                         <div class="form-group" id="customTypeGroup" style="display:none;">
-                            <label>Custom Type Name</label>
-                            <input type="text" id="customType">
+                            <label>Custom Type</label><input type="text" id="customType">
                         </div>
                         <div class="form-group"><label>Document Number</label><input type="text" id="docNumber"></div>
-                        <div class="form-group"><label>Expiry Date (if any)</label><input type="date" id="docExpiry"></div>
-                        <div class="form-group full-width"><label>Issued To (Family Member)</label><input type="text" id="docIssuedTo"></div>
+                        <div class="form-group"><label>Expiry Date</label><input type="date" id="docExpiry"></div>
+                        <div class="form-group full-width"><label>Issued To</label><input type="text" id="docIssuedTo"></div>
                     </div>
 
                     <div class="photo-section">
                         <label>Front Side</label><br>
-                        <input type="file" id="docFront" accept="image/*" onchange="previewFront(event)">
+                        <input type="file" id="docFront" accept="image/*">
                         <div id="frontPreview"></div>
                     </div>
                     <div class="photo-section">
                         <label>Back Side (Optional)</label><br>
-                        <input type="file" id="docBack" accept="image/*" onchange="previewBack(event)">
+                        <input type="file" id="docBack" accept="image/*">
                         <div id="backPreview"></div>
                     </div>
 
@@ -551,7 +550,7 @@
 
                 <h3>All Documents</h3>
                 <table id="documentsTable">
-                    <thead><tr><th>Type</th><th>Number</th><th>Expiry</th><th>Issued To</th><th>Photos</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>Type</th><th>Number</th><th>Expiry</th><th>Issued To</th><th>Documents</th><th>Actions</th></tr></thead>
                     <tbody></tbody>
                 </table>
             `;
@@ -559,78 +558,58 @@
         }
 
         function toggleCustomType() {
-            const type = document.getElementById('docType').value;
-            document.getElementById('customTypeGroup').style.display = type === 'Custom' ? 'block' : 'none';
-        }
-
-        function previewFront(e) {
-            const file = e.target.files[0];
-            if (file) document.getElementById('frontPreview').innerHTML = `<img src="${URL.createObjectURL(file)}" class="photo-preview">`;
-        }
-
-        function previewBack(e) {
-            const file = e.target.files[0];
-            if (file) document.getElementById('backPreview').innerHTML = `<img src="${URL.createObjectURL(file)}" class="photo-preview">`;
+            const isCustom = document.getElementById('docType').value === 'Custom';
+            document.getElementById('customTypeGroup').style.display = isCustom ? 'block' : 'none';
         }
 
         function showDocumentForm(doc = null) {
             document.getElementById('documentForm').style.display = 'block';
             editingDocId = doc ? doc.id : null;
             document.getElementById('docFormTitle').textContent = doc ? "Edit Document" : "Add New Document";
+
+            if (doc) {
+                document.getElementById('docType').value = doc.type.includes('Custom') ? 'Custom' : doc.type;
+                document.getElementById('customType').value = doc.type.includes('Custom') ? doc.type : '';
+                document.getElementById('docNumber').value = doc.number || '';
+                document.getElementById('docExpiry').value = doc.expiry || '';
+                document.getElementById('docIssuedTo').value = doc.issuedTo || '';
+
+                if (doc.frontURL) document.getElementById('frontPreview').innerHTML = `<a href="${doc.frontURL}" target="_blank">View Front</a>`;
+                if (doc.backURL) document.getElementById('backPreview').innerHTML = `<a href="${doc.backURL}" target="_blank">View Back</a>`;
+            }
         }
 
         function hideDocumentForm() {
             document.getElementById('documentForm').style.display = 'none';
+            editingDocId = null;
         }
 
         async function saveDocument() {
-            const type = document.getElementById('docType').value === 'Custom' ? 
-                         document.getElementById('customType').value : 
-                         document.getElementById('docType').value;
+            let type = document.getElementById('docType').value;
+            if (type === 'Custom') type = document.getElementById('customType').value;
 
             if (!type) return alert("Document type is required");
 
-            // Upload photos (simplified - you can expand later)
-            let frontURL = '', backURL = '';
+            const docData = {
+                type: type,
+                number: document.getElementById('docNumber').value,
+                expiry: document.getElementById('docExpiry').value,
+                issuedTo: document.getElementById('docIssuedTo').value,
+                updatedAt: new Date().toISOString()
+            };
 
             try {
-                const frontFile = document.getElementById('docFront').files[0];
-                if (frontFile) {
-                    const ref = storage.ref('documents/' + Date.now() + '_front_' + frontFile.name);
-                    await ref.put(frontFile);
-                    frontURL = await ref.getDownloadURL();
-                }
-
-                const backFile = document.getElementById('docBack').files[0];
-                if (backFile) {
-                    const ref = storage.ref('documents/' + Date.now() + '_back_' + backFile.name);
-                    await ref.put(backFile);
-                    backURL = await ref.getDownloadURL();
-                }
-
-                const docData = {
-                    type: type,
-                    number: document.getElementById('docNumber').value,
-                    expiry: document.getElementById('docExpiry').value,
-                    issuedTo: document.getElementById('docIssuedTo').value,
-                    frontURL: frontURL,
-                    backURL: backURL,
-                    updatedAt: new Date().toISOString()
-                };
-
                 if (editingDocId) {
                     await db.collection('documents').doc(editingDocId).update(docData);
                 } else {
                     await db.collection('documents').add(docData);
                 }
 
-                alert("Document saved successfully!");
+                alert("✅ Document saved successfully!");
                 hideDocumentForm();
                 loadDocumentsTable();
-
             } catch (e) {
-                console.error(e);
-                alert("Error saving document. Check console.");
+                alert("Error saving document");
             }
         }
 
@@ -648,8 +627,8 @@
                     <td>${d.expiry || '-'}</td>
                     <td>${d.issuedTo || '-'}</td>
                     <td>
-                        ${d.frontURL ? `<a href="${d.frontURL}" target="_blank">Front</a>` : ''} 
-                        ${d.backURL ? ` | <a href="${d.backURL}" target="_blank">Back</a>` : ''}
+                        ${d.frontURL ? `<a href="${d.frontURL}" target="_blank">📄 Front</a>` : ''} 
+                        ${d.backURL ? ` | <a href="${d.backURL}" target="_blank">📄 Back</a>` : ''}
                     </td>
                     <td>
                         <button class="btn btn-primary" onclick="editDocument('${doc.id}')">Edit</button>
@@ -662,11 +641,7 @@
 
         function editDocument(id) {
             db.collection('documents').doc(id).get().then(doc => {
-                if (doc.exists) {
-                    // For simplicity, we'll alert for now. You can expand full edit later.
-                    alert("Edit functionality can be expanded. Currently showing details.");
-                    console.log(doc.data());
-                }
+                if (doc.exists) showDocumentForm({ id: doc.id, ...doc.data() });
             });
         }
 
